@@ -29,6 +29,7 @@ async function run() {
         await client.connect();
 
         const usersCollection = client.db("draw-masterDB").collection("users");
+        const classesCollection = client.db("draw-masterDB").collection("classes");
 
         app.post('/jsonwebtoken', (req, res) => {
             const user = req.body;
@@ -36,6 +37,7 @@ async function run() {
             res.send({ token })
         })
 
+        // user collection operation start here
         app.get('/users', async(req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result);
@@ -44,6 +46,12 @@ async function run() {
         app.post('/users', async(req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user);
+            res.send(result);
+        })
+
+        // classes collection operation start here
+        app.get('/classes', async(req, res) => {
+            const result = await classesCollection.find().toArray();
             res.send(result);
         })
 
