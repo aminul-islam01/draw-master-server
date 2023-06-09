@@ -38,7 +38,7 @@ async function run() {
         })
 
         // user collection operation start here
-        app.get('/users', async(req, res) => {
+        app.get('/popular-instructor', async(req, res) => {
             const result = await usersCollection.find().limit(6).toArray();
             res.send(result);
         })
@@ -56,7 +56,7 @@ async function run() {
         })
 
         // classes collection operation start here
-        app.get('/classes', async(req, res) => {
+        app.get('/popular-classes', async(req, res) => {
             const query = {status: 'approved' }
 
             const options = {
@@ -67,6 +67,11 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/classes', async(req, res) => {
+            const query = {status: 'approved'};
+            const result = await classesCollection.find(query).toArray();
+            res.send(result)
+        })
 
 
         console.log("You successfully connected to MongoDB!");
