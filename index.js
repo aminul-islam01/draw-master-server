@@ -51,7 +51,13 @@ async function run() {
 
         // classes collection operation start here
         app.get('/classes', async(req, res) => {
-            const result = await classesCollection.find().toArray();
+            const query = {status: 'approved' }
+            
+            const options = {
+                sort: {student: -1 }
+            }
+            const cursor = classesCollection.find(query, options).limit(6);
+            const result = await cursor.toArray();
             res.send(result);
         })
 
