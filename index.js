@@ -39,7 +39,7 @@ async function run() {
 
         // user collection operation start here
         app.get('/users', async(req, res) => {
-            const result = await usersCollection.find().toArray();
+            const result = await usersCollection.find().limit(6).toArray();
             res.send(result);
         })
 
@@ -52,7 +52,7 @@ async function run() {
         // classes collection operation start here
         app.get('/classes', async(req, res) => {
             const query = {status: 'approved' }
-            
+
             const options = {
                 sort: {student: -1 }
             }
