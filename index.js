@@ -49,6 +49,11 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/all-users', async(req, res) => {
+            const result = await usersCollection.find().toArray();
+            res.send(result)
+        })
+
         app.post('/users', async(req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user);
@@ -64,6 +69,11 @@ async function run() {
             }
             const cursor = classesCollection.find(query, options).limit(6);
             const result = await cursor.toArray();
+            res.send(result);
+        })
+
+        app.get('/all-classes', async(req, res) => {
+            const result = await classesCollection.find().toArray();
             res.send(result);
         })
 
