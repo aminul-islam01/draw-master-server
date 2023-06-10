@@ -83,6 +83,12 @@ async function run() {
             res.send(result)
         })
 
+        app.post('/classes', async(req, res) => {
+            const classes = req.body;
+            const result = await classesCollection.insertOne(classes);
+            res.send(result)
+        })
+
 
         console.log("You successfully connected to MongoDB!");
     } finally {
