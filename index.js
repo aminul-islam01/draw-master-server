@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const app = express();
 const port = process.env.PORT || 5000;
@@ -30,6 +30,7 @@ async function run() {
 
         const usersCollection = client.db("draw-masterDB").collection("users");
         const classesCollection = client.db("draw-masterDB").collection("classes");
+        const cartsCollection = client.db("draw-masterDB").collection("carts");
 
         app.post('/jsonwebtoken', (req, res) => {
             const user = req.body;
@@ -48,6 +49,13 @@ async function run() {
             const result = await usersCollection.find(query).toArray();
             res.send(result)
         })
+
+        // app.get('/instructor/:id', async(req, res) => {
+        //     const id = req.params.id;
+        //     const query = {_id: new ObjectId(id)};
+        //     const result = usersCollection.findOne(query);
+        //     res.send(result)
+        // })
 
         app.get('/all-users', async(req, res) => {
             const result = await usersCollection.find().toArray();
@@ -82,10 +90,38 @@ async function run() {
             const result = await classesCollection.find(query).toArray();
             res.send(result)
         })
+        
+        app.get('/instructors-classes', async(req, res) => {
+            const email = req.query.email;
+            const query = {instructorEmail: email};
+            const result = await classesCollection.find(query).toArray();
+            res.send(result)
+        })
 
         app.post('/classes', async(req, res) => {
             const classes = req.body;
             const result = await classesCollection.insertOne(classes);
+            res.send(result)
+        })
+
+        // carts collection operation start here
+        app.post('/cart-classes', async(req, res) => {
+            const selectedClass = req.body;
+
+            const query = {id: selectedClass.id}
+            const existing = await cartsCollection.findOne(query);
+
+            if(existing){
+                return res.send('this class already selected');
+            }
+            const result = await cartsCollection.insertOne(selectedClass);
+            res.send(result)
+        })
+
+        app.get('/selected-classes', async(req, res) => {
+            const email = req.query.email;
+            const query = {email: email}
+            const result = await cartsCollection.find(query).toArray();
             res.send(result)
         })
 
