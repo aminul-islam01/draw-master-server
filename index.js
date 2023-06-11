@@ -87,7 +87,7 @@ async function run() {
 
             const query = { email: email }
             const user = await usersCollection.findOne(query);
-            // const result = { admin: user?.role === 'admin' }
+
             if(user.role === 'admin'){
                 return res.send({role:"admin"})
             }else if(user.role === 'instructor'){
@@ -95,7 +95,6 @@ async function run() {
             }else{
                 return res.send({role: "student"})
             }
-            res.send(result);
         })
 
 
@@ -103,6 +102,32 @@ async function run() {
             const user = req.body;
             const result = await usersCollection.insertOne(user);
             res.send(result);
+        })
+
+        app.patch('/user/admin', async(req, res) => {
+            const user = req.body;
+            const id = user._id;
+            const filter = {_id: new ObjectId(id)}
+            const updateDoc = {
+                $set: {
+                  role: 'admin'
+                },
+              };
+            const result = await usersCollection.updateOne(filter, updateDoc)
+            res.send(result)
+        })
+
+        app.patch('/user/instructor', async(req, res) => {
+            const user = req.body;
+            const id = user._id;
+            const filter = {_id: new ObjectId(id)}
+            const updateDoc = {
+                $set: {
+                  role: 'instructor'
+                },
+              };
+            const result = await usersCollection.updateOne(filter, updateDoc)
+            res.send(result)
         })
 
         // classes collection operation start here
@@ -117,7 +142,7 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/all-classes', async (req, res) => {
+        app.get('/all-classes', verifyJWT, async (req, res) => {
             const result = await classesCollection.find().toArray();
             res.send(result);
         })
@@ -159,6 +184,13 @@ async function run() {
             const email = req.query.email;
             const query = { email: email }
             const result = await cartsCollection.find(query).toArray();
+            res.send(result)
+        })
+
+        app.delete('/delete-classes/:id', verifyJWT, async(req, res) => {
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)}
+            const result = await cartsCollection.deleteOne(query);
             res.send(result)
         })
 
