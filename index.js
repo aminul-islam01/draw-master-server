@@ -12,6 +12,22 @@ app.use(cors());
 app.use(express.json());
 
 
+const verifyJWT = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'unauthorized access' });
+    }
+    const token = authorization.split(' ')[1];
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ error: true, message: 'unauthorized access' })
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.aws78to.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -39,13 +55,13 @@ async function run() {
         })
 
         // user collection operation start here
-        app.get('/popular-instructor', async(req, res) => {
+        app.get('/popular-instructor', async (req, res) => {
             const result = await usersCollection.find().limit(6).toArray();
             res.send(result);
         })
 
-        app.get('/instructors', async(req, res) => {
-            const query = {role:'instructor'};
+        app.get('/instructors', async (req, res) => {
+            const query = { role: 'instructor' };
             const result = await usersCollection.find(query).toArray();
             res.send(result)
         })
@@ -57,70 +73,91 @@ async function run() {
         //     res.send(result)
         // })
 
-        app.get('/all-users', async(req, res) => {
+        app.get('/all-users', async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result)
         })
 
-        app.post('/users', async(req, res) => {
+        app.get('/users/role/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+
+            if (req.decoded.email !== email) {
+                return res.send({ user: false })
+            }
+
+            const query = { email: email }
+            const user = await usersCollection.findOne(query);
+            // const result = { admin: user?.role === 'admin' }
+            if(user.role === 'admin'){
+                return res.send({role:"admin"})
+            }else if(user.role === 'instructor'){
+                return res.send({role: "instructor"})
+            }else{
+                return res.send({role: "student"})
+            }
+            res.send(result);
+        })
+
+
+        app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user);
             res.send(result);
         })
 
         // classes collection operation start here
-        app.get('/popular-classes', async(req, res) => {
-            const query = {status: 'approved' }
+        app.get('/popular-classes', async (req, res) => {
+            const query = { status: 'approved' }
 
             const options = {
-                sort: {student: -1 }
+                sort: { student: -1 }
             }
             const cursor = classesCollection.find(query, options).limit(6);
             const result = await cursor.toArray();
             res.send(result);
         })
 
-        app.get('/all-classes', async(req, res) => {
+        app.get('/all-classes', async (req, res) => {
             const result = await classesCollection.find().toArray();
             res.send(result);
         })
 
-        app.get('/classes', async(req, res) => {
-            const query = {status: 'approved'};
-            const result = await classesCollection.find(query).toArray();
-            res.send(result)
-        })
-        
-        app.get('/instructors-classes', async(req, res) => {
-            const email = req.query.email;
-            const query = {instructorEmail: email};
+        app.get('/classes', async (req, res) => {
+            const query = { status: 'approved' };
             const result = await classesCollection.find(query).toArray();
             res.send(result)
         })
 
-        app.post('/classes', async(req, res) => {
+        app.get('/instructors-classes', async (req, res) => {
+            const email = req.query.email;
+            const query = { instructorEmail: email };
+            const result = await classesCollection.find(query).toArray();
+            res.send(result)
+        })
+
+        app.post('/classes', async (req, res) => {
             const classes = req.body;
             const result = await classesCollection.insertOne(classes);
             res.send(result)
         })
 
         // carts collection operation start here
-        app.post('/cart-classes', async(req, res) => {
+        app.post('/cart-classes', async (req, res) => {
             const selectedClass = req.body;
 
-            const query = {id: selectedClass.id}
+            const query = { id: selectedClass.id }
             const existing = await cartsCollection.findOne(query);
 
-            if(existing){
+            if (existing) {
                 return res.send('this class already selected');
             }
             const result = await cartsCollection.insertOne(selectedClass);
             res.send(result)
         })
 
-        app.get('/selected-classes', async(req, res) => {
+        app.get('/selected-classes', verifyJWT, async (req, res) => {
             const email = req.query.email;
-            const query = {email: email}
+            const query = { email: email }
             const result = await cartsCollection.find(query).toArray();
             res.send(result)
         })
