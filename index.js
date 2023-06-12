@@ -2,8 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const stripe = require("stripe")(process.env.PAYMENT_SECTERT_KEY)
 require('dotenv').config()
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY)
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -56,6 +56,25 @@ async function run() {
             res.send({ token })
         })
 
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await usersCollection.findOne(query);
+            if (user?.role !== 'admin') {
+                return res.status(403).send({ error: true, message: 'forbidden access' });
+            }
+            next();
+        }
+        const verifyInstructor = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await usersCollection.findOne(query);
+            if (user?.role !== 'instructor') {
+                return res.status(403).send({ error: true, message: 'forbidden access' });
+            }
+            next();
+        }
+
         // user collection operation start here
         app.get('/popular-instructor', async (req, res) => {
             const result = await usersCollection.find().limit(6).toArray();
@@ -68,7 +87,7 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/all-users', verifyJWT, async (req, res) => {
+        app.get('/all-users', verifyJWT, verifyAdmin, async (req, res) => {
             const result = await usersCollection.find().toArray();
             res.send(result)
         })
@@ -95,11 +114,16 @@ async function run() {
 
         app.post('/users', async (req, res) => {
             const user = req.body;
+            const query = { email: user.email };
+            const exist = await usersCollection.findOne(query);
+            if (exist) {
+                return res.send('user already exist')
+            }
             const result = await usersCollection.insertOne(user);
             res.send(result);
         })
 
-        app.patch('/user/admin', async (req, res) => {
+        app.patch('/user/admin', verifyJWT, verifyAdmin, async (req, res) => {
             const user = req.body;
             const id = user._id;
             const filter = { _id: new ObjectId(id) }
@@ -112,7 +136,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/user/instructor', async (req, res) => {
+        app.patch('/user/instructor', verifyJWT, verifyAdmin, async (req, res) => {
             const user = req.body;
             const id = user._id;
             const filter = { _id: new ObjectId(id) }
@@ -137,31 +161,31 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/all-classes', async (req, res) => {
+        app.get('/all-classes',verifyJWT, verifyAdmin, async (req, res) => {
             const result = await classesCollection.find().toArray();
             res.send(result);
         })
 
-        app.get('/classes', async (req, res) => {
+        app.get('/approved-classes', async (req, res) => {
             const query = { status: 'approved' };
             const result = await classesCollection.find(query).toArray();
             res.send(result)
         })
 
-        app.get('/instructors-classes', async (req, res) => {
+        app.get('/instructors-classes', verifyJWT,  async (req, res) => {
             const email = req.query.email;
             const query = { instructorEmail: email };
             const result = await classesCollection.find(query).toArray();
             res.send(result)
         })
 
-        app.post('/classes', async (req, res) => {
+        app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
             const classes = req.body;
             const result = await classesCollection.insertOne(classes);
             res.send(result)
         })
 
-        app.patch('/approve-class', async (req, res) => {
+        app.patch('/approve-class', verifyJWT, verifyAdmin, async (req, res) => {
             const approveClass = req.body;
             const id = approveClass._id;
             const filter = { _id: new ObjectId(id) };
@@ -174,7 +198,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/deny-class', async (req, res) => {
+        app.patch('/deny-class', verifyJWT, verifyAdmin, async (req, res) => {
             const denyClass = req.body;
             const id = denyClass._id;
             const filter = { _id: new ObjectId(id) };
@@ -187,7 +211,7 @@ async function run() {
             res.send(result)
         })
 
-        app.patch('/feedback-class', async (req, res) => {
+        app.patch('/feedback-class', verifyJWT, verifyAdmin, async (req, res) => {
             const feedbackClass = req.body;
             const id = feedbackClass._id;
             const filter = { _id: new ObjectId(id) }
@@ -196,15 +220,18 @@ async function run() {
                     feedback: feedbackClass.feedback
                 }
             }
-            const result = classesCollection.updateOne(filter, updateDoc);
+            const result = await classesCollection.updateOne(filter, updateDoc);
             res.send(result)
         })
 
         // carts collection operation start here
-        app.post('/cart-classes', async (req, res) => {
+        app.post('/cart-classes', verifyJWT, async (req, res) => {
             const selectedClass = req.body;
 
-            const query = { id: selectedClass.id }
+            const query = {
+                id: selectedClass.id,
+                email: selectedClass.email
+            }
             const existing = await cartsCollection.findOne(query);
 
             if (existing) {
@@ -214,9 +241,9 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/card-class/:id', async(req, res) => {
+        app.get('/card-class/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id: new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const result = await cartsCollection.findOne(query);
             res.send(result);
         })
@@ -237,8 +264,8 @@ async function run() {
 
         // create payment intent
         app.post("/create-payment-intent", verifyJWT, async (req, res) => {
-            const { price } = req.body;
-            const amount = parseInt(price * 100);
+            const { totalPrice } = req.body;
+            const amount = parseInt(totalPrice * 100);
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: amount,
                 currency: "usd",
@@ -250,9 +277,31 @@ async function run() {
         });
 
         // payment collection operation start here 
-        app.post('/payments', async(req, res) => {
+        app.post('/payments/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
             const payment = req.body;
-            const result = paymentsCollection.insertOne(payment);
+            const classId = payment.classId;
+
+            
+            //data delete form cart collection 
+            const query = {_id: new ObjectId(id)}
+            await cartsCollection.deleteOne(query);
+
+            // update class student
+            const filter = {_id: new ObjectId(classId)}
+            const oldClass = await classesCollection.findOne(filter);
+            const updateSeat = parseInt(oldClass?.availableSeat -1);
+            const updateStudent = parseInt(oldClass?.student +1);
+            const updateDoc = {
+                $set: {
+                    availableSeat: updateSeat,
+                    student: updateStudent
+                }
+            }
+            await classesCollection.updateOne(filter, updateDoc);
+
+            // add data to payment collection
+            const result = await paymentsCollection.insertOne(payment);
             res.send(result)
         })
 
