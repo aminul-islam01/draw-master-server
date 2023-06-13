@@ -172,17 +172,39 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/instructors-classes', verifyJWT,  async (req, res) => {
+        app.get('/instructors-classes', verifyJWT, verifyInstructor,  async (req, res) => {
             const email = req.query.email;
             const query = { instructorEmail: email };
             const result = await classesCollection.find(query).toArray();
             res.send(result)
         })
 
+        app.get('/class/:id', async(req, res) => {
+            const id = req.params.id;
+            const query = {_id: new ObjectId(id)};
+            const result = await classesCollection.findOne(query);
+            res.send(result);
+        })
+
         app.post('/classes', verifyJWT, verifyInstructor, async (req, res) => {
             const classes = req.body;
             const result = await classesCollection.insertOne(classes);
             res.send(result)
+        })
+
+        app.patch('/class/:id', verifyJWT, verifyInstructor, async(req, res) => {
+            const id = req.params.id;
+            const {updateSeat, updatePrice} = req.body;
+            const filter = {_id: new ObjectId(id)};
+            // const result = await classesCollection.findOne(query);
+            const updateDoc = {
+                $set: {
+                    availableSeat: updateSeat,
+                    price: updatePrice
+                }
+            }
+            const result = await classesCollection.updateOne(filter, updateDoc);
+            res.send(result);
         })
 
         app.patch('/approve-class', verifyJWT, verifyAdmin, async (req, res) => {
@@ -244,20 +266,27 @@ async function run() {
         app.get('/card-class/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
-            const result = await cartsCollection.findOne(query);
+            const result = await classesCollection.findOne(query);
             res.send(result);
         })
 
-        app.get('/selected-classes', verifyJWT, async (req, res) => {
+        app.get('/selected-classes', verifyJWT,  async (req, res) => {
             const email = req.query.email;
-            const query = { email: email }
-            const result = await cartsCollection.find(query).toArray();
-            res.send(result)
+            const selectedClasses = { email: email }
+            const result = await cartsCollection.find(selectedClasses).toArray();
+
+            const query = { _id: { $in: result.map(selectedClass => new ObjectId(selectedClass.id)) } }
+            const classes = await classesCollection.find(query).toArray();
+            res.send(classes)
         })
 
-        app.delete('/delete-classes/:id', verifyJWT, async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: new ObjectId(id) }
+        app.delete('/delete-classes', verifyJWT, async (req, res) => {
+            const id = req.query.id;
+            const email = req.query.email;
+            const query = { 
+                id: id,
+                email: email
+            }
             const result = await cartsCollection.deleteOne(query);
             res.send(result)
         })
@@ -280,15 +309,17 @@ async function run() {
         app.post('/payments/:id', verifyJWT, async (req, res) => {
             const id = req.params.id;
             const payment = req.body;
-            const classId = payment.classId;
 
             
             //data delete form cart collection 
-            const query = {_id: new ObjectId(id)}
+            const query = {
+                id: id,
+                email: payment.email
+            }
             await cartsCollection.deleteOne(query);
 
             // update class student
-            const filter = {_id: new ObjectId(classId)}
+            const filter = {_id: new ObjectId(id)}
             const oldClass = await classesCollection.findOne(filter);
             const updateSeat = parseInt(oldClass?.availableSeat -1);
             const updateStudent = parseInt(oldClass?.student +1);
@@ -303,6 +334,16 @@ async function run() {
             // add data to payment collection
             const result = await paymentsCollection.insertOne(payment);
             res.send(result)
+        })
+
+        app.get('/enrolled-classes', async (req, res) => {
+            const email = req.query.email;
+            const classes = { email: email }
+            const result = await paymentsCollection.find(classes).toArray();
+
+            const query = { _id: { $in: result.map(enrollClass => new ObjectId(enrollClass.classId)) } }
+            const enrolledClasses = await classesCollection.find(query).toArray();
+            res.send(enrolledClasses)
         })
 
 
