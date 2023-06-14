@@ -256,10 +256,14 @@ async function run() {
                 email: selectedClass.email
             }
             const existing = await cartsCollection.findOne(query);
+            const enrolled = await paymentsCollection.findOne(query);
 
             if (existing) {
-                return res.send('this class already selected');
+                return res.send('selected');
+            }else if(enrolled){
+                return res.send('enrolled');
             }
+            
             const result = await cartsCollection.insertOne(selectedClass);
             res.send(result)
         })
@@ -352,7 +356,7 @@ async function run() {
             const classes = { email: email }
             const result = await paymentsCollection.find(classes).toArray();
 
-            const query = { _id: { $in: result.map(enrollClass => new ObjectId(enrollClass.classId)) } }
+            const query = { _id: { $in: result.map(enrollClass => new ObjectId(enrollClass.id)) } }
             const enrolledClasses = await classesCollection.find(query).toArray();
             res.send(enrolledClasses)
         })
