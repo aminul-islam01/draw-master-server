@@ -43,12 +43,13 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        client.connect();
 
         const usersCollection = client.db("draw-masterDB").collection("users");
         const classesCollection = client.db("draw-masterDB").collection("classes");
         const cartsCollection = client.db("draw-masterDB").collection("carts");
         const paymentsCollection = client.db("draw-masterDB").collection("payments");
+        const feedbackCollection = client.db("draw-masterDB").collection("feedback");
 
         app.post('/jsonwebtoken', (req, res) => {
             const user = req.body;
@@ -102,9 +103,9 @@ async function run() {
             const query = { email: email }
             const user = await usersCollection.findOne(query);
 
-            if (user.role === 'admin') {
+            if (user?.role === 'admin') {
                 return res.send({ role: "admin" })
-            } else if (user.role === 'instructor') {
+            } else if (user?.role === 'instructor') {
                 return res.send({ role: "instructor" })
             } else {
                 return res.send({ role: "student" })
@@ -336,7 +337,17 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/enrolled-classes', async (req, res) => {
+        app.get('/payment-history/:email', async(req, res) => {
+            const email = req.params.email;
+            const query = {email: email};
+            const options = {
+                sort: { date: -1 }
+            }
+            const result = await paymentsCollection.find(query, options).toArray();
+            res.send(result);
+        })
+
+        app.get('/enrolled-classes', verifyJWT, async (req, res) => {
             const email = req.query.email;
             const classes = { email: email }
             const result = await paymentsCollection.find(classes).toArray();
@@ -344,6 +355,12 @@ async function run() {
             const query = { _id: { $in: result.map(enrollClass => new ObjectId(enrollClass.classId)) } }
             const enrolledClasses = await classesCollection.find(query).toArray();
             res.send(enrolledClasses)
+        })
+
+        // feedback collection operation start here
+        app.get('/student-feedback', async(req, res) => {
+            const result = await feedbackCollection.find().toArray();
+            res.send(result)
         })
 
 
